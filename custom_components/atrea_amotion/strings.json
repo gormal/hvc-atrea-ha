@@ -1,0 +1,22 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Atrea DUPLEX (aMotion)",
+        "description": "Enter the ventilation unit's Modbus TCP details. Modbus must be enabled on the unit (aMotion app/web → Settings → System → Modbus).",
+        "data": {
+          "host": "IP address",
+          "port": "Port",
+          "slave": "Unit ID",
+          "scan_interval": "Scan interval (seconds)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect. Check the IP address, that Modbus is enabled on the unit, and that TCP port 502 is reachable."
+    },
+    "abort": {
+      "already_configured": "This unit is already configured."
+    }
+  }
+}

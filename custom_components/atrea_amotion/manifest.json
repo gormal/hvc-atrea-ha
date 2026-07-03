@@ -1,0 +1,11 @@
+{
+  "domain": "atrea_amotion",
+  "name": "Atrea DUPLEX (aMotion)",
+  "version": "0.1.1",
+  "config_flow": true,
+  "documentation": "https://github.com/kotas24/hvc-atrea-ha",
+  "issue_tracker": "https://github.com/kotas24/hvc-atrea-ha/issues",
+  "codeowners": ["@kotas24"],
+  "requirements": ["pymodbus>=3.5.0"],
+  "iot_class": "local_polling"
+}

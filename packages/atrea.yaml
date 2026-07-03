@@ -1,0 +1,517 @@
+# =============================================================================
+#  ATREA DUPLEX (aMotion controller) — Home Assistant Modbus package
+# =============================================================================
+#  Built from Atrea's official document "Komunikace MODBUS - RD5 a aMotion",
+#  version 04 (2025-04-25), section 3.2 "Regulace aMotion".
+#
+#  How to use:
+#    1. Put this file in  <config>/packages/atrea.yaml
+#    2. In configuration.yaml add (once):
+#         homeassistant:
+#           packages: !include_dir_named packages
+#    3. In secrets.yaml add:
+#         atrea_host: 192.168.x.x     # the unit's LAN IP (set a DHCP reservation)
+#    4. Restart Home Assistant.
+#
+#  ---------------------------------------------------------------------------
+#  RATE LIMIT (important): aMotion allows max 30 Modbus sessions per 30 s.
+#  Each polled entity = 1 session. This package throttles reads with
+#  `message_wait_milliseconds` + conservative `scan_interval`s so we stay well
+#  under the limit. If you add many more entities, raise the scan_intervals.
+#
+#  Addressing: the index numbers in Atrea's doc ARE the Modbus addresses.
+#    I#### -> input_type: input        (read-only measured / requested values)
+#    H#### -> input_type: holding      (writable command registers)
+#    D#### -> input_type: discrete_input (read-only status bits / alarms)
+#    C#### -> coil                     (writable pulse commands, e.g. resets)
+#  HA modbus is 0-based, matching Atrea's indexes directly.
+#
+#  Temperatures are signed int16 / 10  (e.g. raw 65535 = -0.1 °C).
+#  Airflow values are raw * 10 = m³/h  (e.g. raw 230 = 2300 m³/h).
+# =============================================================================
+
+modbus:
+  - name: atrea
+    type: tcp
+    host: !secret atrea_host
+    port: 502
+    # Atrea answers on any unit id 1-255; we use 1 everywhere for consistency.
+    # Throttle so we never burst past 30 requests / 30 s:
+    message_wait_milliseconds: 800
+    delay: 2                       # settle time after HA connects before first read
+    timeout: 5
+
+    # ----------------------------- READ: sensors ----------------------------
+    sensors:
+      # --- Requested / current setpoints (what the unit is currently targeting)
+      - name: "Atrea Mode (raw)"
+        unique_id: atrea_mode_raw
+        slave: 1
+        address: 1001            # I1001 Aktuální požadovaný režim
+        input_type: input
+        data_type: uint16
+        scan_interval: 30
+
+      - name: "Atrea Setpoint Temperature"
+        unique_id: atrea_setpoint_temp
+        slave: 1
+        address: 1002            # I1002 Aktuální požadovaná teplota (÷10 °C)
+        input_type: input
+        data_type: uint16
+        scale: 0.1
+        precision: 1
+        unit_of_measurement: "°C"
+        device_class: temperature
+        scan_interval: 30
+
+      - name: "Atrea Requested Fan Power"
+        unique_id: atrea_req_power
+        slave: 1
+        address: 1004            # I1004 Aktuální požadovaný výkon (0-100 %)
+        input_type: input
+        data_type: uint16
+        unit_of_measurement: "%"
+        scan_interval: 30
+
+      - name: "Atrea Requested Airflow"
+        unique_id: atrea_req_airflow
+        slave: 1
+        address: 1005            # I1005 Aktuální požadovaný průtok (×10 m³/h)
+        input_type: input
+        data_type: uint16
+        scale: 10
+        unit_of_measurement: "m³/h"
+        scan_interval: 30
+
+      # --- Configuration diagnostics (which fan-control mode is active) -------
+      # I1201: 0=Direct %, 1=Constant pressure, 2=Constant airflow,
+      #        3=External, 4=Direct per-fan, 5=Constant airflow per-fan.
+      # This tells you whether "Fan Power %" (H1004) or "Airflow" (H1005) is
+      # the control that actually works on YOUR unit.
+      - name: "Atrea Fan Control Mode (I1201)"
+        unique_id: atrea_fan_ctrl_mode
+        slave: 1
+        address: 1201
+        input_type: input
+        data_type: uint16
+        entity_category: diagnostic
+        scan_interval: 300
+
+      - name: "Atrea Max Settable Airflow"
+        unique_id: atrea_max_airflow
+        slave: 1
+        address: 1202            # I1202 (×10 m³/h)
+        input_type: input
+        data_type: uint16
+        scale: 10
+        unit_of_measurement: "m³/h"
+        entity_category: diagnostic
+        scan_interval: 600
+
+      - name: "Atrea Min Settable Airflow"
+        unique_id: atrea_min_airflow
+        slave: 1
+        address: 1203            # I1203 (×10 m³/h)
+        input_type: input
+        data_type: uint16
+        scale: 10
+        unit_of_measurement: "m³/h"
+        entity_category: diagnostic
+        scan_interval: 600
+
+      # --- Measured temperatures (signed int16 ÷ 10) -------------------------
+      - name: "Atrea T-ODA Outdoor Air"
+        unique_id: atrea_t_oda
+        slave: 1
+        address: 1101            # I1101
+        input_type: input
+        data_type: int16
+        scale: 0.1
+        precision: 1
+        unit_of_measurement: "°C"
+        device_class: temperature
+        scan_interval: 60
+
+      - name: "Atrea T-SUP Supply Air"
+        unique_id: atrea_t_sup
+        slave: 1
+        address: 1102            # I1102
+        input_type: input
+        data_type: int16
+        scale: 0.1
+        precision: 1
+        unit_of_measurement: "°C"
+        device_class: temperature
+        scan_interval: 60
+
+      - name: "Atrea T-ETA Extract Air"
+        unique_id: atrea_t_eta
+        slave: 1
+        address: 1103            # I1103
+        input_type: input
+        data_type: int16
+        scale: 0.1
+        precision: 1
+        unit_of_measurement: "°C"
+        device_class: temperature
+        scan_interval: 60
+
+      - name: "Atrea T-IDA Indoor Air"
+        unique_id: atrea_t_ida
+        slave: 1
+        address: 1104            # I1104
+        input_type: input
+        data_type: int16
+        scale: 0.1
+        precision: 1
+        unit_of_measurement: "°C"
+        device_class: temperature
+        scan_interval: 60
+
+      - name: "Atrea T-EHA Exhaust Air"
+        unique_id: atrea_t_eha
+        slave: 1
+        address: 1105            # I1105
+        input_type: input
+        data_type: int16
+        scale: 0.1
+        precision: 1
+        unit_of_measurement: "°C"
+        device_class: temperature
+        scan_interval: 60
+
+      # --- Actual airflow per fan (×10 m³/h) ---------------------------------
+      - name: "Atrea Airflow Supply (M-SUP)"
+        unique_id: atrea_flow_sup
+        slave: 1
+        address: 1109            # I1109
+        input_type: input
+        data_type: uint16
+        scale: 10
+        unit_of_measurement: "m³/h"
+        scan_interval: 60
+
+      - name: "Atrea Airflow Extract (M-ETA)"
+        unique_id: atrea_flow_eta
+        slave: 1
+        address: 1110            # I1110
+        input_type: input
+        data_type: uint16
+        scale: 10
+        unit_of_measurement: "m³/h"
+        scan_interval: 60
+
+      # --- Operating state (enum, see template sensor below) -----------------
+      - name: "Atrea Operating State (raw)"
+        unique_id: atrea_op_state_raw
+        slave: 1
+        address: 1119            # I1119 Aktuální provozní mód
+        input_type: input
+        data_type: uint16
+        scan_interval: 60
+
+    # ------------------------- READ: binary_sensors ------------------------
+    # Curated set of the most useful alarms/warnings (section 3.2.3).
+    # Full list D6003..D6111 is in the PDF; add more here if you want them,
+    # but mind the 30-req/30s limit (raise scan_intervals if you add a lot).
+    binary_sensors:
+      - name: "Atrea Fans Running"
+        unique_id: atrea_fans_running
+        slave: 1
+        address: 2301            # D2301
+        input_type: discrete_input
+        scan_interval: 60
+
+      - name: "Atrea Alarm: Overheat"
+        unique_id: atrea_alarm_overheat
+        slave: 1
+        address: 6012            # D6012 Přehřátí jednotky
+        input_type: discrete_input
+        device_class: problem
+        scan_interval: 120
+
+      - name: "Atrea Alarm: Frost Protection 1"
+        unique_id: atrea_alarm_frost1
+        slave: 1
+        address: 6003            # D6003 1. mrazová ochrana
+        input_type: discrete_input
+        device_class: problem
+        scan_interval: 120
+
+      - name: "Atrea Alarm: Unbalanced Airflow"
+        unique_id: atrea_alarm_unbalanced
+        slave: 1
+        address: 6014            # D6014 Nevyrovnaný průtok
+        input_type: discrete_input
+        device_class: problem
+        scan_interval: 120
+
+      - name: "Atrea Warning: Insufficient Airflow"
+        unique_id: atrea_warn_lowflow
+        slave: 1
+        address: 6015            # D6015 Nedostatečný průtok
+        input_type: discrete_input
+        device_class: problem
+        scan_interval: 120
+
+      - name: "Atrea Warning: Filters Dirty"
+        unique_id: atrea_warn_filters
+        slave: 1
+        address: 6104            # D6104 Zanesené filtry
+        input_type: discrete_input
+        device_class: problem
+        scan_interval: 120
+
+      - name: "Atrea Alarm: Ethernet Comm Fault"
+        unique_id: atrea_alarm_eth
+        slave: 1
+        address: 6073            # D6073 Porucha komunikace na Ethernetu
+        input_type: discrete_input
+        device_class: problem
+        scan_interval: 120
+
+      - name: "Atrea Alarm: Device Not Ready"
+        unique_id: atrea_alarm_notready
+        slave: 1
+        address: 6085            # D6085 Zařízení není připraveno
+        input_type: discrete_input
+        device_class: problem
+        scan_interval: 120
+
+# ---------------------------------------------------------------------------
+#  Template sensors: turn the raw enum registers into readable text.
+# ---------------------------------------------------------------------------
+template:
+  - sensor:
+      - name: "Atrea Mode"
+        unique_id: atrea_mode_text
+        state: >-
+          {% set m = states('sensor.atrea_mode_raw') | int(-1) %}
+          {{ {
+            0:'Off', 1:'Auto', 2:'Ventilation', 3:'Circulation+Vent',
+            4:'Circulation', 5:'Night cooling', 6:'Balancing',
+            7:'Overpressure', 8:'Ventilation Mix'
+          }.get(m, 'Unknown') }}
+        icon: >-
+          {{ 'mdi:fan-off' if states('sensor.atrea_mode_raw')|int(-1) == 0 else 'mdi:fan' }}
+
+      - name: "Atrea Operating State"
+        unique_id: atrea_op_state_text
+        state: >-
+          {% set s = states('sensor.atrea_op_state_raw') | int(-1) %}
+          {{ {
+            0:'Off', 1:'Condensate evaporation', 2:'Run-down', 3:'Normal',
+            4:'Filter test', 5:'Flow stabilization', 6:'Substitute control',
+            7:'Ventilation interval', 8:'Reduced ventilation',
+            9:'HX defrosting', 10:'Forced circulation', 11:'Start-up',
+            12:'Preheating', 13:'Frost protection', 14:'Preventive stop',
+            15:'Safety stop'
+          }.get(s, 'Unknown') }}
+
+# ---------------------------------------------------------------------------
+#  Control helpers (the UI you interact with). These are "command" inputs;
+#  the matching sensor.* above shows the unit's ACTUAL value. An automation
+#  writes each helper to the unit when you change it.
+# ---------------------------------------------------------------------------
+input_select:
+  atrea_set_mode:
+    name: Atrea Set Mode
+    icon: mdi:hvac
+    options:
+      - "Off"
+      - "Auto"
+      - "Ventilation"
+      - "Circulation+Vent"
+      - "Circulation"
+      - "Night cooling"
+      - "Balancing"
+      - "Overpressure"
+      - "Ventilation Mix"
+
+  atrea_set_bypass:
+    name: Atrea Set Bypass
+    icon: mdi:valve
+    options:
+      - "Auto"
+      - "Closed"
+      - "Open"
+
+  atrea_set_zone:
+    name: Atrea Set Zone
+    icon: mdi:home-floor-a
+    options:
+      - "Both zones"
+      - "Zone 1"
+      - "Zone 2"
+
+input_number:
+  atrea_set_temperature:
+    name: Atrea Set Temperature
+    icon: mdi:thermometer
+    min: 10
+    max: 40
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: box
+
+  # Use this when Fan Control Mode (I1201) = 0  (Direct %).
+  atrea_set_power:
+    name: Atrea Set Fan Power
+    icon: mdi:fan
+    min: 0
+    max: 100
+    step: 5
+    unit_of_measurement: "%"
+    mode: slider
+
+  # Use this when Fan Control Mode (I1201) = 2  (Constant airflow).
+  # Adjust min/max to your unit's limits (see sensors Min/Max Settable Airflow).
+  atrea_set_airflow:
+    name: Atrea Set Airflow
+    icon: mdi:weather-windy
+    min: 0
+    max: 400        # m³/h; raise to your unit's I1202 max if higher
+    step: 10
+    unit_of_measurement: "m³/h"
+    mode: box
+
+# ---------------------------------------------------------------------------
+#  Write automations: push helper changes to the unit's holding registers.
+#  Writes are persistent on the unit — no need to repeat them.
+# ---------------------------------------------------------------------------
+automation:
+  - id: atrea_write_mode
+    alias: "Atrea: write mode"
+    trigger:
+      - platform: state
+        entity_id: input_select.atrea_set_mode
+    condition:
+      - condition: template
+        value_template: "{{ trigger.to_state.state not in [None, 'unknown', 'unavailable'] }}"
+    action:
+      - service: modbus.write_register
+        data:
+          hub: atrea
+          slave: 1
+          address: 1001          # H1001 Požadovaný režim
+          value: >-
+            {{ {
+              'Off':0,'Auto':1,'Ventilation':2,'Circulation+Vent':3,
+              'Circulation':4,'Night cooling':5,'Balancing':6,
+              'Overpressure':7,'Ventilation Mix':8
+            }[trigger.to_state.state] }}
+
+  - id: atrea_write_temperature
+    alias: "Atrea: write temperature"
+    trigger:
+      - platform: state
+        entity_id: input_number.atrea_set_temperature
+    action:
+      - service: modbus.write_register
+        data:
+          hub: atrea
+          slave: 1
+          address: 1002          # H1002 Požadovaná teplota (value = °C × 10)
+          value: "{{ (trigger.to_state.state | float * 10) | round(0) | int }}"
+
+  - id: atrea_write_power
+    alias: "Atrea: write fan power (%)"
+    trigger:
+      - platform: state
+        entity_id: input_number.atrea_set_power
+    action:
+      - service: modbus.write_register
+        data:
+          hub: atrea
+          slave: 1
+          address: 1004          # H1004 Požadovaný výkon ventilátorů (1-100 %)
+          value: "{{ trigger.to_state.state | float | round(0) | int }}"
+
+  - id: atrea_write_airflow
+    alias: "Atrea: write airflow (m³/h)"
+    trigger:
+      - platform: state
+        entity_id: input_number.atrea_set_airflow
+    action:
+      - service: modbus.write_register
+        data:
+          hub: atrea
+          slave: 1
+          address: 1005          # H1005 Požadovaný průtok větrání (value = m³/h ÷ 10)
+          value: "{{ (trigger.to_state.state | float / 10) | round(0) | int }}"
+
+  - id: atrea_write_bypass
+    alias: "Atrea: write bypass"
+    trigger:
+      - platform: state
+        entity_id: input_select.atrea_set_bypass
+    condition:
+      - condition: template
+        value_template: "{{ trigger.to_state.state not in [None, 'unknown', 'unavailable'] }}"
+    action:
+      - service: modbus.write_register
+        data:
+          hub: atrea
+          slave: 1
+          address: 1009          # H1009 Povel na klapku bypassu (0=Auto,1=Closed,2=Open)
+          value: "{{ {'Auto':0,'Closed':1,'Open':2}[trigger.to_state.state] }}"
+
+  - id: atrea_write_zone
+    alias: "Atrea: write zone"
+    trigger:
+      - platform: state
+        entity_id: input_select.atrea_set_zone
+    condition:
+      - condition: template
+        value_template: "{{ trigger.to_state.state not in [None, 'unknown', 'unavailable'] }}"
+    action:
+      - service: modbus.write_register
+        data:
+          hub: atrea
+          slave: 1
+          address: 1003          # H1003 Požadovaná zóna (0=Both,1=Z1,2=Z2)
+          value: "{{ {'Both zones':0,'Zone 1':1,'Zone 2':2}[trigger.to_state.state] }}"
+
+  # Initialise the helpers from the unit's actual values on startup, so the UI
+  # reflects reality (and doesn't immediately write stale values back).
+  - id: atrea_sync_helpers_on_start
+    alias: "Atrea: sync helpers on startup"
+    trigger:
+      - platform: homeassistant
+        event: start
+    action:
+      - delay: "00:00:20"        # wait for first Modbus reads
+      - service: input_number.set_value
+        target: { entity_id: input_number.atrea_set_temperature }
+        data:
+          value: "{{ states('sensor.atrea_setpoint_temp') | float(20) }}"
+      - service: input_select.select_option
+        target: { entity_id: input_select.atrea_set_mode }
+        data:
+          option: "{{ states('sensor.atrea_mode') }}"
+
+# ---------------------------------------------------------------------------
+#  Reset buttons (coils are pulse commands).
+# ---------------------------------------------------------------------------
+script:
+  atrea_reset_alarms:
+    alias: "Atrea: reset alarms"
+    icon: mdi:alarm-light
+    sequence:
+      - service: modbus.write_coil
+        data:
+          hub: atrea
+          slave: 1
+          address: 8001         # C8001 Reset alarmů
+          state: true
+
+  atrea_reset_filter_counter:
+    alias: "Atrea: reset filter counter"
+    icon: mdi:air-filter
+    sequence:
+      - service: modbus.write_coil
+        data:
+          hub: atrea
+          slave: 1
+          address: 8002         # C8002 Reset intervalu výměny filtru
+          state: true
