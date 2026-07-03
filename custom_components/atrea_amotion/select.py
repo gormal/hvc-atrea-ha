@@ -64,8 +64,10 @@ class AtreaBypassSelect(AtreaEntity, SelectEntity):
 
     @property
     def available(self) -> bool:
-        # I1206 == 0 (or unread) means no bypass damper is fitted.
-        return super().available and self._ir.get(1206, 0) != 0
+        # The bypass is only commandable when its control method (I1206) is
+        # "User-controlled" (1). When it's "Not fitted" (0) or "Automatic by
+        # temperature" (2), the unit rejects writes to H1009, so hide the control.
+        return super().available and self._ir.get(1206) == 1
 
     @property
     def current_option(self) -> str | None:
