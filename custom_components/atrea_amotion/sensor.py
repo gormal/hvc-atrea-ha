@@ -106,6 +106,16 @@ SENSORS: tuple[AtreaSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda ir: BYPASS_DAMPER_MAP.get(ir.get(1206), None),
     ),
+    # Raw value of I1009 (current bypass command) for diagnosis: we want to see
+    # exactly what the unit reports in automatic mode (0=Auto, 1=Open, 2=Closed,
+    # or a sentinel). Once confirmed, this can drive a proper open/closed state.
+    AtreaSensorDescription(
+        key="bypass_command_raw",
+        name="Bypass command (raw)",
+        icon="mdi:numeric",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda ir: ir.get(1009),
+    ),
     AtreaSensorDescription(
         key="circulation_damper",
         name="Circulation damper",
