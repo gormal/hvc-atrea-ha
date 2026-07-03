@@ -63,6 +63,11 @@ class AtreaBypassSelect(AtreaEntity, SelectEntity):
         super().__init__(coordinator, entry, "bypass")
 
     @property
+    def available(self) -> bool:
+        # I1206 == 0 (or unread) means no bypass damper is fitted.
+        return super().available and self._ir.get(1206, 0) != 0
+
+    @property
     def current_option(self) -> str | None:
         # Read uses a different encoding than write (see const.py).
         return BYPASS_READ_MAP.get(self._ir.get(1009))
@@ -80,6 +85,12 @@ class AtreaZoneSelect(AtreaEntity, SelectEntity):
 
     def __init__(self, coordinator, entry) -> None:
         super().__init__(coordinator, entry, "zone")
+
+    @property
+    def available(self) -> bool:
+        # Zoning has no "installed" config register; treat a valid 0/1/2
+        # reading as "equipped", a sentinel/other value as "not equipped".
+        return super().available and self._ir.get(REG_ZONE) in ZONE_MAP
 
     @property
     def current_option(self) -> str | None:

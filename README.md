@@ -91,7 +91,8 @@ Grouped under a single **Atrea DUPLEX** device:
 - **Sensors:** Mode, Operating state, Setpoint temperature, Requested fan power,
   Requested airflow, five air temperatures (T-ODA / T-SUP / T-ETA / T-IDA / T-EHA),
   Airflow supply, Airflow extract.
-- **Diagnostics:** Fan control mode, Min/Max settable airflow.
+- **Diagnostics:** Fan control mode, Bypass damper, Circulation damper,
+  Min/Max settable airflow.
 - **Binary sensors (alarms):** overheat, frost protection, unbalanced airflow,
   insufficient airflow, dirty filters, ethernet communication fault,
   device-not-ready, fans running.

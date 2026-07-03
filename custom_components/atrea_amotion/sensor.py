@@ -23,6 +23,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     AIRFLOW_MODES,
+    BYPASS_DAMPER_MAP,
+    CIRC_DAMPER_MAP,
     DOMAIN,
     FAN_CTRL_MAP,
     MODE_MAP,
@@ -96,6 +98,20 @@ SENSORS: tuple[AtreaSensorDescription, ...] = (
         icon="mdi:cog",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda ir: FAN_CTRL_MAP.get(ir.get(1201), None),
+    ),
+    AtreaSensorDescription(
+        key="bypass_damper",
+        name="Bypass damper",
+        icon="mdi:valve",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda ir: BYPASS_DAMPER_MAP.get(ir.get(1206), None),
+    ),
+    AtreaSensorDescription(
+        key="circulation_damper",
+        name="Circulation damper",
+        icon="mdi:valve",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda ir: CIRC_DAMPER_MAP.get(ir.get(1205), None),
     ),
     AtreaSensorDescription(
         key="max_airflow",

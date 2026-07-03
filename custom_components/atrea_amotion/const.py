@@ -27,6 +27,7 @@ INPUT_BLOCKS: tuple[tuple[int, int], ...] = (
     (1109, 2),    # I1109..I1110  actual airflow SUP / ETA
     (1119, 1),    # I1119         operating state
     (1201, 3),    # I1201..I1203  fan-control mode, max/min settable airflow
+    (1205, 2),    # I1205..I1206  circulation / bypass damper control method
 )
 
 # Discrete inputs (D####) read individually (guaranteed-valid addresses).
@@ -97,6 +98,22 @@ FAN_CTRL_MAP: dict[int, str] = {
     3: "External",
     4: "Direct % per fan",
     5: "Constant airflow per fan",
+}
+
+# I1205 circulation damper control method (0 = not fitted)
+CIRC_DAMPER_MAP: dict[int, str] = {
+    0: "Not fitted",
+    1: "ON/OFF",
+    2: "Eco",
+    3: "Comfort",
+    4: "Adjustable position",
+}
+
+# I1206 bypass damper control method (0 = not fitted)
+BYPASS_DAMPER_MAP: dict[int, str] = {
+    0: "Not fitted",
+    1: "User-controlled",
+    2: "Automatic (by temperature)",
 }
 
 # Zone: read I1003 and write H1003 use the same encoding.
