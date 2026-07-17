@@ -49,7 +49,6 @@ REG_ZONE = 1003        # H1003 Pozadovana zona
 REG_POWER = 1004       # H1004 Pozadovany vykon ventilatoru (1-100 %)
 REG_AIRFLOW = 1005     # H1005 Pozadovany prutok vetrani (value = m3/h / 10)
 REG_BYPASS = 1009      # H1009 Povel na klapku bypassu
-REG_SEASON = 1010      # H1010 Nastaveni sezony (write) / I1010 aktualni sezona (read)
 
 # Coils (C####) -- pulse commands.
 COIL_RESET_ALARMS = 8001   # C8001
@@ -115,17 +114,6 @@ BYPASS_DAMPER_MAP: dict[int, str] = {
     0: "Not fitted",
     1: "User-controlled",
     2: "Automatic (by temperature)",
-}
-
-# Season: read I1010 reports the effective season (2=Heating, 3=Non-heating).
-SEASON_READ_MAP: dict[int, str] = {2: "Heating", 3: "Non-heating"}
-
-# Season override: write H1010 chooses how the season is determined.
-SEASON_SET_TO_VALUE: dict[str, int] = {
-    "Auto (by outdoor temp)": 0,
-    "Auto + heat gain": 1,
-    "Force heating": 2,
-    "Force non-heating": 3,
 }
 
 # Zone: read I1003 and write H1003 use the same encoding.
