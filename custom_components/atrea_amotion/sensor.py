@@ -29,6 +29,7 @@ from .const import (
     FAN_CTRL_MAP,
     MODE_MAP,
     POWER_MODES,
+    SEASON_READ_MAP,
     STATE_MAP,
     airflow_m3h,
     power_pct,
@@ -65,6 +66,12 @@ SENSORS: tuple[AtreaSensorDescription, ...] = (
         name="Operating state",
         icon="mdi:state-machine",
         value_fn=lambda ir: STATE_MAP.get(ir.get(1119), None),
+    ),
+    AtreaSensorDescription(
+        key="season",
+        name="Season",
+        icon="mdi:sun-snowflake-variant",
+        value_fn=lambda ir: SEASON_READ_MAP.get(ir.get(1010), None),
     ),
     AtreaSensorDescription(
         key="setpoint_temperature",

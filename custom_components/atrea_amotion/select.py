@@ -15,7 +15,9 @@ from .const import (
     MODE_TO_VALUE,
     REG_BYPASS,
     REG_MODE,
+    REG_SEASON,
     REG_ZONE,
+    SEASON_SET_TO_VALUE,
     ZONE_MAP,
     ZONE_TO_VALUE,
 )
@@ -32,6 +34,7 @@ async def async_setup_entry(
     async_add_entities(
         [
             AtreaModeSelect(coordinator, entry),
+            AtreaSeasonSelect(coordinator, entry),
             AtreaBypassSelect(coordinator, entry),
             AtreaZoneSelect(coordinator, entry),
         ]
@@ -52,6 +55,34 @@ class AtreaModeSelect(AtreaEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         await self.coordinator.async_write_register(REG_MODE, MODE_TO_VALUE[option])
+
+
+class AtreaSeasonSelect(AtreaEntity, SelectEntity):
+    """Override how the unit determines heating vs. non-heating season (H1010).
+
+    The unit reports only the *effective* season (I1010), not which override is
+    active, so this control is optimistic: it shows the last option written.
+    Use the read-only "Season" sensor to see the current effective season.
+    """
+
+    _attr_name = "Season override"
+    _attr_icon = "mdi:sun-snowflake-variant"
+    _attr_options = list(SEASON_SET_TO_VALUE.keys())
+
+    def __init__(self, coordinator, entry) -> None:
+        super().__init__(coordinator, entry, "season_override")
+        self._selected: str | None = None
+
+    @property
+    def current_option(self) -> str | None:
+        return self._selected
+
+    async def async_select_option(self, option: str) -> None:
+        await self.coordinator.async_write_register(
+            REG_SEASON, SEASON_SET_TO_VALUE[option]
+        )
+        self._selected = option
+        self.async_write_ha_state()
 
 
 class AtreaBypassSelect(AtreaEntity, SelectEntity):
